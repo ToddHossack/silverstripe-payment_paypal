@@ -139,7 +139,7 @@ else
 	if($ack=="SUCCESS" || $ack=="SUCCESSWITHWARNING")
 	{
 		//Getting transaction ID from API responce. 
-		$TransactionID = urldecode9$resArray["TRANSACTIONID"]);
+		$TransactionID = urldecode($resArray["TRANSACTIONID"]);
 		
 		echo "Your payment has been successfully processed";
 	}
