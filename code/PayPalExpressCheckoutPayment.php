@@ -253,7 +253,7 @@ class PayPalExpressCheckoutPayment extends Payment{
 		//$feeAmt					= $response["FEEAMT"];  		//' PayPal fee amount charged for the transaction
 		//$settleAmt				= $response["SETTLEAMT"];  		//' Amount deposited in your PayPal account after a currency conversion.
 		//$taxAmt					= $response["TAXAMT"];  		//' Tax charged on the transaction.
-		//$exchangeRate			= $response["EXCHANGERATE"];  	//' Exchange rate if a currency conversion occurred. Relevant only if your are billing in their non-primary currency. If the customer chooses to pay with a currency other than the non-primary currency, the conversion occurs in the customer’s account.
+		//$exchangeRate			= $response["EXCHANGERATE"];  	//' Exchange rate if a currency conversion occurred. Relevant only if your are billing in their non-primary currency. If the customer chooses to pay with a currency other than the non-primary currency, the conversion occurs in the customerÂ’s account.
 
 		if(isset($response["PAYMENTINFO_0_PAYMENTSTATUS"])){
 
