@@ -92,9 +92,10 @@ class PayPalExpressCheckoutPayment extends Payment{
 		}
 		$paymenturl = $this->getTokenURL($this->Amount->Amount,$this->Amount->Currency,$data);
 
-		$this->Status = "Pending";
+		$this->Status = 'Incomplete';
 		$this->write();
-
+		
+		
 		if($paymenturl){
 			Director::redirect($paymenturl); //redirect to payment gateway
 			return new Payment_Processing();
@@ -199,11 +200,11 @@ class PayPalExpressCheckoutPayment extends Payment{
 					"\nMode: $mode".
 					"\nAPI url: ".$this->getApiEndpoint().
 					"\nRedirect url: ".$this->getPayPalURL("TOKENGOESHERE").
-					"\nUsername: " .self::$API_UserName.
-					"\nPassword: " .self::$API_Password.
-					"\nSignature: ".self::$API_Signature.
+					//"\nUsername: " .self::$API_UserName. // Let's keep these credentials out of the logs
+					//"\nPassword: " .self::$API_Password.
+					//"\nSignature: ".self::$API_Signature.
 					"\nResponse ".print_r($response,true);
-			Debug::log($debugmessage);
+			error_log($debugmessage);
 
 			return null;
 		}
@@ -234,7 +235,7 @@ class PayPalExpressCheckoutPayment extends Payment{
 		$response = $this->apiCall('DoExpressCheckoutPayment',$data);
 
 		if(!isset($response['ACK']) ||  !(strtoupper($response['ACK']) == "SUCCESS" || strtoupper($response['ACK']) == "SUCCESSWITHWARNING")){
-			return null;
+			return new Payment_Failure();
 		}
 
 
@@ -284,12 +285,14 @@ class PayPalExpressCheckoutPayment extends Payment{
 				case "CANCEL-REVERSAL": // A reversal has been canceled; for example, when you win a dispute and the funds for the reversal have been returned to you.
 					break;
 				case "IN-PROGRESS":
+					$this->Status = 'Pending';
 					$this->Message = _t('PayPalPayment.INPROGRESS',"The transaction has not terminated");//, e.g. an authorization may be awaiting completion.";
 					break;
 				case "PARTIALLY-REFUNDED":
 					$this->Message = _t('PayPalPayment.PARTIALLYREFUNDED',"The payment has been partially refunded.");
 					break;
 				case "PENDING":
+					$this->Status = 'Pending';
 					$this->Message = _t('PayPalPayment.PENDING',"The payment is pending.");
 					if(isset($response["PAYMENTINFO_0_PENDINGREASON"])){
 						$this->Message .= " ".$this->getPendingReason($response["PAYMENTINFO_0_PENDINGREASON"]);
@@ -304,7 +307,7 @@ class PayPalExpressCheckoutPayment extends Payment{
 		//$reasonCode		= $response["REASONCODE"];
 
 		$this->write();
-
+		return (in_array($this->Status,array('Success','Pending')) ? new Payment_Success : new Payment_Failure);
 	}
 
 	protected function getPendingReason($reason){
@@ -415,13 +418,15 @@ class PaypalExpressCheckoutaPayment_Handler extends Controller{
 		'cancel'
 	);
 
+	static $failure_url;
+
 	function payment(){
 		if($this->payment){
 			return $this->payment;
 		}
 
 		if($token = Controller::getRequest()->getVar('token')){
-			$p =  DataObject::get_one('PayPalExpressCheckoutPayment',"\"Token\" = '$token' AND \"Status\" = 'Pending'");
+			$p =  DataObject::get_one('PayPalExpressCheckoutPayment',"\"Token\" = '$token' AND \"Status\" = 'Incomplete'");
 			$this->payment = $p;
 			return $p;
 		}
@@ -429,7 +434,6 @@ class PaypalExpressCheckoutaPayment_Handler extends Controller{
 	}
 
 	function confirm($request){
-
 		//TODO: pretend the user confirmed, and skip straight to results. (check that this is allowed)
 		//TODO: get updated shipping details from paypal??
 
@@ -439,7 +443,11 @@ class PaypalExpressCheckoutaPayment_Handler extends Controller{
 				$payment->PayerID = $pid;
 				$payment->write();
 
-				$payment->confirmPayment();
+				$result = $payment->confirmPayment();
+				if(method_exists($payment,'finalise')) {
+					$payment->finalise($result);
+				}
+				return;
 			}
 
 		}else{
@@ -451,7 +459,6 @@ class PaypalExpressCheckoutaPayment_Handler extends Controller{
 	}
 
 	function cancel($request){
-
 		if($payment = $this->payment()){
 
 			//TODO: do API call to gather further information
@@ -459,6 +466,10 @@ class PaypalExpressCheckoutaPayment_Handler extends Controller{
 			$payment->Status = "Failure";
 			$payment->Message = _t('PayPalPayment.USERCANCELLED',"User cancelled");
 			$payment->write();
+			if(method_exists($payment,'finalise')) {
+				$payment->finalise(new Payment_Failure);
+			}
+			return;
 		}
 
 		$this->doRedirect();
@@ -466,14 +477,18 @@ class PaypalExpressCheckoutaPayment_Handler extends Controller{
 	}
 
 	function doRedirect(){
-
+		
 		$payment = $this->payment();
 		if($payment && $obj = $payment->PaidObject()){
 			Director::redirect($obj->Link());
 			return;
 		}
-
-		Director::redirect(Director::absoluteURL('home',true)); //TODO: make this customisable in Payment_Controllers
+		if(!empty(static::$failure_url)) {
+			Director::redirect(Director::absoluteURL(static::$failure_url,true));
+		} else {
+			Director::redirect(Director::absoluteURL('home',true)); //TODO: make this customisable in Payment_Controllers
+		}
+		
 		return;
 	}
 }
