@@ -79,17 +79,21 @@ class PayPalExpressCheckoutPayment extends Payment{
 
 	//main processing function
 	function processPayment($data, $form) {
-
+		$user_error = null;
 		//sanity checks for credentials
 		if(!self::$API_UserName || !self::$API_Password || !self::$API_Signature){
-			user_error('You are attempting to make a payment without the necessary credentials set.', E_USER_ERROR);
+			$user_error = 'You are attempting to make a payment without the necessary credentials set.';
 		}
 		if(!$this->Amount->Amount) {
-			user_error('No amount is set.', E_USER_ERROR);
+			$user_error = 'Sorry, you cannot pay with PayPal if the amount is zero.';
 		}
 		if(!$this->Amount->Currency) {
-			user_error('No currency is set.', E_USER_ERROR);
+			$user_error = 'No currency is set.';
 		}
+		if($user_error) {
+			return new Payment_Failure($user_error);
+		}
+		
 		$paymenturl = $this->getTokenURL($this->Amount->Amount,$this->Amount->Currency,$data);
 
 		$this->Status = 'Incomplete';
