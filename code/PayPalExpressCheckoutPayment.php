@@ -85,7 +85,7 @@ class PayPalExpressCheckoutPayment extends Payment{
 			$user_error = 'You are attempting to make a payment without the necessary credentials set.';
 		}
 		if(!$this->Amount->Amount) {
-			$user_error = 'Sorry, you cannot pay with PayPal if the amount is zero.';
+			$user_error = 'Sorry, you cannot pay with PayPal if the amount is zero. Please try another method.';
 		}
 		if(!$this->Amount->Currency) {
 			$user_error = 'No currency is set.';
